@@ -1,0 +1,693 @@
+import BlandJensenFormal.BlandJensenMI.Rado
+import BlandJensenFormal.MIQuotientLabels
+import Mathlib.LinearAlgebra.Prod
+
+/-!
+# Common-core coordinate templates for the six one-element minors
+
+This file isolates the linear-algebraic mechanism shared by the six proposed
+rational representations of the one-element minors of `MI n`.  The ambient
+space is written explicitly as a direct product
+
+`(Fin n → ℚ) × (Fin q → ℚ)`.
+
+The first factor is the common `n`-dimensional core and the second factor is
+the fixed-dimensional quotient-label space.  A large block with quotient
+label `p` is allowed the subspace `W + ℚ p`.  Special vectors may have an
+arbitrary component in `W`; their contribution modulo `W` is therefore
+exactly their quotient projection.
+
+The main result below is an equality of subspaces, not merely a dimension
+bound: as soon as a finite family contains at least one large block, its sum
+is the full inverse image of the span of its quotient labels.  Consequently
+its dimension is
+
+`n + finrank (span of quotient labels)`.
+
+The rest of the file records the six fixed quotient templates and their
+distinguished relations.  It deliberately does not perform the matroid-minor
+base audit; that logically separate verification belongs in the minor files.
+-/
+
+namespace BlandJensenFormal.BlandJensenMI.Templates
+
+open Function Set Submodule
+
+/-- The common-core coordinate space. -/
+abbrev CoreSpace (n : ℕ) := Fin n → ℚ
+
+/-- The fixed-dimensional quotient-label coordinate space. -/
+abbrev QuotientSpace (q : ℕ) := Fin q → ℚ
+
+/-- Direct-product coordinates for a template with core dimension `n` and
+quotient dimension `q`. -/
+abbrev Ambient (n q : ℕ) := CoreSpace n × QuotientSpace q
+
+/-- Inclusion of the common core into the ambient direct product. -/
+def coreInclusion (n q : ℕ) : CoreSpace n →ₗ[ℚ] Ambient n q :=
+  LinearMap.inl ℚ (CoreSpace n) (QuotientSpace q)
+
+/-- Inclusion of quotient coordinates with zero common-core component. -/
+def quotientInclusion (n q : ℕ) : QuotientSpace q →ₗ[ℚ] Ambient n q :=
+  LinearMap.inr ℚ (CoreSpace n) (QuotientSpace q)
+
+/-- Projection from the ambient product to quotient coordinates. -/
+def quotientProjection (n q : ℕ) : Ambient n q →ₗ[ℚ] QuotientSpace q :=
+  LinearMap.snd ℚ (CoreSpace n) (QuotientSpace q)
+
+/-- The common core `W`, intrinsically defined as the kernel of quotient
+projection. -/
+def core (n q : ℕ) : Submodule ℚ (Ambient n q) :=
+  LinearMap.ker (quotientProjection n q)
+
+@[simp] theorem quotientProjection_apply (n q : ℕ) (x : Ambient n q) :
+    quotientProjection n q x = x.2 := rfl
+
+@[simp] theorem coreInclusion_apply (n q : ℕ) (w : CoreSpace n) :
+    coreInclusion n q w = (w, 0) := rfl
+
+@[simp] theorem quotientInclusion_apply (n q : ℕ) (p : QuotientSpace q) :
+    quotientInclusion n q p = (0, p) := rfl
+
+@[simp] theorem mem_core_iff (n q : ℕ) (x : Ambient n q) :
+    x ∈ core n q ↔ x.2 = 0 := by
+  rfl
+
+theorem core_eq_range (n q : ℕ) :
+    core n q = LinearMap.range (coreInclusion n q) := by
+  exact LinearMap.ker_snd ℚ (CoreSpace n) (QuotientSpace q)
+
+/-- The quotient-coordinate factor has dimension `q`. -/
+@[simp] theorem finrank_quotientSpace (q : ℕ) :
+    Module.finrank ℚ (QuotientSpace q) = q := by
+  simp
+
+/-- The ambient direct-product coordinate space has dimension `n + q`. -/
+@[simp] theorem finrank_ambient (n q : ℕ) :
+    Module.finrank ℚ (Ambient n q) = n + q := by
+  simp [Module.finrank_prod]
+
+theorem quotientProjection_surjective (n q : ℕ) :
+    Function.Surjective (quotientProjection n q) := by
+  intro p
+  exact ⟨(0, p), rfl⟩
+
+/-- The core has exactly the advertised dimension `n`. -/
+@[simp] theorem finrank_core (n q : ℕ) :
+    Module.finrank ℚ (core n q) = n := by
+  rw [core_eq_range]
+  rw [LinearMap.finrank_range_of_inj]
+  · simp
+  · intro x y h
+    exact congrArg Prod.fst h
+
+/-- The full inverse image of a quotient subspace. -/
+def corePlus (n q : ℕ) (P : Submodule ℚ (QuotientSpace q)) :
+    Submodule ℚ (Ambient n q) :=
+  P.comap (quotientProjection n q)
+
+@[simp] theorem mem_corePlus_iff (n q : ℕ)
+    (P : Submodule ℚ (QuotientSpace q)) (x : Ambient n q) :
+    x ∈ corePlus n q P ↔ x.2 ∈ P := by
+  rfl
+
+/-- Explicit direct-product coordinates on the inverse image of a quotient
+subspace. -/
+def corePlusEquiv (n q : ℕ) (P : Submodule ℚ (QuotientSpace q)) :
+    corePlus n q P ≃ₗ[ℚ] CoreSpace n × P where
+  toFun x := (x.1.1, ⟨x.1.2, x.2⟩)
+  invFun x := ⟨(x.1, x.2.1), x.2.2⟩
+  left_inv x := by ext <;> rfl
+  right_inv x := by ext <;> rfl
+  map_add' _ _ := rfl
+  map_smul' _ _ := rfl
+
+/-- Exact dimension of a common-core inverse image. -/
+@[simp] theorem finrank_corePlus (n q : ℕ)
+    (P : Submodule ℚ (QuotientSpace q)) :
+    Module.finrank ℚ (corePlus n q P) =
+      n + Module.finrank ℚ P := by
+  rw [(corePlusEquiv n q P).finrank_eq, Module.finrank_prod,
+    Module.finrank_pi]
+  simp
+
+/-- The allowed subspace for a large block with quotient label `p`: the
+common core together with the line generated by `p`. -/
+def largeBlockSubspace (n q : ℕ) (p : QuotientSpace q) :
+    Submodule ℚ (Ambient n q) :=
+  corePlus n q (ℚ ∙ p)
+
+/-- The intrinsic inverse-image definition of a large-block subspace agrees
+with the displayed formula `U_p = W ⊔ ℚ(0,p)`. -/
+theorem largeBlockSubspace_eq_core_sup_span (n q : ℕ)
+    (p : QuotientSpace q) :
+    largeBlockSubspace n q p =
+      core n q ⊔ ℚ ∙ quotientInclusion n q p := by
+  apply le_antisymm
+  · intro x hx
+    have hxp : x.2 ∈ ℚ ∙ p := hx
+    refine Submodule.mem_sup.mpr ⟨(x.1, 0), ?_, (0, x.2), ?_, ?_⟩
+    · rfl
+    · obtain ⟨a, ha⟩ := Submodule.mem_span_singleton.mp hxp
+      exact Submodule.mem_span_singleton.mpr ⟨a, by
+        ext <;> simp [ha]⟩
+    · ext <;> simp
+  · refine sup_le ?_ ?_
+    · intro x hx
+      exact (mem_corePlus_iff n q _ x).2 <| by
+        rw [(mem_core_iff n q x).1 hx]
+        exact Submodule.zero_mem _
+    · rw [Submodule.span_singleton_le_iff_mem]
+      exact Submodule.mem_span_singleton_self p
+
+theorem core_le_largeBlockSubspace (n q : ℕ) (p : QuotientSpace q) :
+    core n q ≤ largeBlockSubspace n q p := by
+  intro x hx
+  exact (mem_corePlus_iff n q _ x).2 <| by simp [(mem_core_iff n q x).1 hx]
+
+@[simp] theorem quotientProjection_map_largeBlockSubspace
+    (n q : ℕ) (p : QuotientSpace q) :
+    (largeBlockSubspace n q p).map (quotientProjection n q) = ℚ ∙ p := by
+  apply le_antisymm
+  · rintro y ⟨x, hx, rfl⟩
+    exact hx
+  · intro y hy
+    exact ⟨(0, y), hy, rfl⟩
+
+/-- A special vector with independently specified common-core and quotient
+coordinates. -/
+def specialLift {n q : ℕ} (w : CoreSpace n) (p : QuotientSpace q) :
+    Ambient n q :=
+  (w, p)
+
+@[simp] theorem quotientProjection_specialLift {n q : ℕ}
+    (w : CoreSpace n) (p : QuotientSpace q) :
+    quotientProjection n q (specialLift w p) = p := rfl
+
+/-- Adding a common-core vector does not change quotient coordinates. -/
+theorem quotientProjection_add_of_mem_core {n q : ℕ}
+    (v w : Ambient n q) (hw : w ∈ core n q) :
+    quotientProjection n q (v + w) = quotientProjection n q v := by
+  rw [map_add, show quotientProjection n q w = 0 from hw, add_zero]
+
+/-- A finite sum of lines is the span of their finite set of generators. -/
+theorem subspaceSum_span_labels {ι : Type*} [DecidableEq ι] {q : ℕ}
+    (label : ι → QuotientSpace q) (B : Finset ι) :
+    subspaceSum ℚ (fun i ↦ ℚ ∙ label i) B =
+      Submodule.span ℚ (label '' (B : Set ι)) := by
+  induction B using Finset.induction_on with
+  | empty => simp
+  | @insert i B hi ih =>
+      rw [subspaceSum_insert, Finset.coe_insert, Set.image_insert_eq,
+        Submodule.span_insert, ih]
+
+/-- The quotient-label span attached to selected large blocks and selected
+special vectors.  Only the quotient projections of special vectors occur. -/
+def selectedQuotientSpan {ι κ : Type*} [DecidableEq ι] [DecidableEq κ]
+    {n q : ℕ} (label : ι → QuotientSpace q)
+    (special : κ → Ambient n q) (B : Finset ι) (S : Finset κ) :
+    Submodule ℚ (QuotientSpace q) :=
+  Submodule.span ℚ
+    (label '' (B : Set ι) ∪
+      quotientProjection n q '' (special '' (S : Set κ)))
+
+/-- The sum of selected large-block subspaces and the span of selected
+special vectors. -/
+def selectedSubspace {ι κ : Type*} [DecidableEq ι] [DecidableEq κ]
+    {n q : ℕ} (label : ι → QuotientSpace q)
+    (special : κ → Ambient n q) (B : Finset ι) (S : Finset κ) :
+    Submodule ℚ (Ambient n q) :=
+  subspaceSum ℚ (fun i ↦ largeBlockSubspace n q (label i)) B ⊔
+    Submodule.span ℚ (special '' (S : Set κ))
+
+/-- Quotienting a selected sum by the common core leaves exactly the span of
+the selected quotient labels. -/
+theorem map_selectedSubspace {ι κ : Type*} [DecidableEq ι] [DecidableEq κ]
+    {n q : ℕ} (label : ι → QuotientSpace q)
+    (special : κ → Ambient n q) (B : Finset ι) (S : Finset κ) :
+    (selectedSubspace label special B S).map (quotientProjection n q) =
+      selectedQuotientSpan label special B S := by
+  rw [selectedSubspace, selectedQuotientSpan, Submodule.map_sup,
+    ← subspaceSum_map]
+  simp_rw [quotientProjection_map_largeBlockSubspace]
+  rw [subspaceSum_span_labels, Submodule.map_span, Submodule.span_union]
+
+/-- Any selected sum containing a large block contains the full common core. -/
+theorem core_le_selectedSubspace {ι κ : Type*} [DecidableEq ι] [DecidableEq κ]
+    {n q : ℕ} (label : ι → QuotientSpace q)
+    (special : κ → Ambient n q) {B : Finset ι} (hB : B.Nonempty)
+    (S : Finset κ) :
+    core n q ≤ selectedSubspace label special B S := by
+  obtain ⟨i, hi⟩ := hB
+  calc
+    core n q ≤ largeBlockSubspace n q (label i) :=
+      core_le_largeBlockSubspace n q (label i)
+    _ ≤ subspaceSum ℚ (fun j ↦ largeBlockSubspace n q (label j)) B :=
+      by simpa [subspaceSum] using
+        (Finset.le_sup (f := fun j ↦ largeBlockSubspace n q (label j)) hi)
+    _ ≤ selectedSubspace label special B S := le_sup_left
+
+/-- Exact common-core/quotient decomposition for every selected family that
+contains at least one large block. -/
+theorem selectedSubspace_eq_corePlus {ι κ : Type*}
+    [DecidableEq ι] [DecidableEq κ] {n q : ℕ}
+    (label : ι → QuotientSpace q) (special : κ → Ambient n q)
+    {B : Finset ι} (hB : B.Nonempty) (S : Finset κ) :
+    selectedSubspace label special B S =
+      corePlus n q (selectedQuotientSpan label special B S) := by
+  rw [← map_selectedSubspace label special B S]
+  exact (Submodule.comap_map_eq_self
+    (core_le_selectedSubspace label special hB S)).symm
+
+/-- The exact dimension formula used in all six representation templates. -/
+theorem finrank_selectedSubspace {ι κ : Type*}
+    [DecidableEq ι] [DecidableEq κ] {n q : ℕ}
+    (label : ι → QuotientSpace q) (special : κ → Ambient n q)
+    {B : Finset ι} (hB : B.Nonempty) (S : Finset κ) :
+    Module.finrank ℚ (selectedSubspace label special B S) =
+      n + Module.finrank ℚ (selectedQuotientSpan label special B S) := by
+  rw [selectedSubspace_eq_corePlus label special hB S, finrank_corePlus]
+
+/-! ## A canonical common-core perturbation -/
+
+/-- A distinguished common-core vector.  It is zero exactly in the boundary
+case `n = 0`, and is the first standard coordinate vector when `n > 0`. -/
+def coreDelta (n : ℕ) : CoreSpace n :=
+  if h : 0 < n then
+    fun i ↦ if i = (⟨0, h⟩ : Fin n) then 1 else 0
+  else
+    0
+
+@[simp] theorem coreDelta_zero : coreDelta 0 = 0 := by
+  simp [coreDelta]
+
+@[simp] theorem coreDelta_at_zero {n : ℕ} (h : 0 < n) :
+    coreDelta n (⟨0, h⟩ : Fin n) = 1 := by
+  simp [coreDelta, h]
+
+theorem coreDelta_ne_zero {n : ℕ} (h : 0 < n) : coreDelta n ≠ 0 := by
+  intro hzero
+  have := congrFun hzero (⟨0, h⟩ : Fin n)
+  simp [coreDelta, h] at this
+
+theorem coreDelta_eq_zero_iff (n : ℕ) : coreDelta n = 0 ↔ n = 0 := by
+  constructor
+  · intro hzero
+    by_contra hn
+    exact coreDelta_ne_zero (Nat.pos_of_ne_zero hn) hzero
+  · rintro rfl
+    exact coreDelta_zero
+
+/-! ## Deletion of an element of the `X` block -/
+
+namespace DeleteX
+
+abbrev QuotientLabel := BlandJensenFormal.MIQuotientLabels.DeleteX.Label
+
+/-- The quotient dimension in the `M \ x` template. -/
+abbrev quotientDim : ℕ := 3
+
+/-- The seven quotient labels `a,b,c,c-b,a+c,a+b,a+b+c`. -/
+def quotientLabel : QuotientLabel → QuotientSpace quotientDim :=
+  BlandJensenFormal.MIQuotientLabels.DeleteX.label
+
+inductive Block
+  | A | B | C
+  deriving DecidableEq, Fintype, Repr
+
+inductive Special
+  | One | Two | Three | Four
+  deriving DecidableEq, Fintype, Repr
+
+def blockLabel : Block → QuotientSpace quotientDim
+  | .A => quotientLabel .A
+  | .B => quotientLabel .B
+  | .C => quotientLabel .C
+
+/-- The four fixed special vectors, chosen with zero common-core component. -/
+def special (n : ℕ) : Special → Ambient n quotientDim
+  | .One => quotientInclusion n quotientDim (quotientLabel .One)
+  | .Two => quotientInclusion n quotientDim (quotientLabel .Two)
+  | .Three => quotientInclusion n quotientDim (quotientLabel .Three)
+  | .Four => quotientInclusion n quotientDim (quotientLabel .Four)
+
+@[simp] theorem quotientProjection_special (n : ℕ) (e : Special) :
+    quotientProjection n quotientDim (special n e) =
+      match e with
+      | .One => quotientLabel .One
+      | .Two => quotientLabel .Two
+      | .Three => quotientLabel .Three
+      | .Four => quotientLabel .Four := by
+  cases e <;> rfl
+
+theorem quotient_relation :
+    quotientLabel .One = quotientLabel .Two - quotientLabel .Three := by
+  funext i
+  fin_cases i <;> norm_num [quotientLabel,
+    BlandJensenFormal.MIQuotientLabels.DeleteX.label]
+
+/-- The fixed three-special dependence `q₁ = q₂ - q₃`. -/
+theorem special_relation (n : ℕ) :
+    special n .One = special n .Two - special n .Three := by
+  simpa [special] using
+    congrArg (quotientInclusion n quotientDim) quotient_relation
+
+theorem finrank_selected {n : ℕ} {B : Finset Block} (hB : B.Nonempty)
+    (S : Finset Special) :
+    Module.finrank ℚ (selectedSubspace blockLabel (special n) B S) =
+      n + Module.finrank ℚ
+        (selectedQuotientSpan blockLabel (special n) B S) :=
+  finrank_selectedSubspace blockLabel (special n) hB S
+
+end DeleteX
+
+/-! ## Deletion of the special element `1` -/
+
+namespace DeleteOne
+
+abbrev QuotientLabel := BlandJensenFormal.MIQuotientLabels.DeleteOne.Label
+
+abbrev quotientDim : ℕ := 3
+
+/-- The six quotient labels `a,b,c,a+c,a+b,a+b+c`. -/
+def quotientLabel : QuotientLabel → QuotientSpace quotientDim :=
+  BlandJensenFormal.MIQuotientLabels.DeleteOne.label
+
+inductive Block
+  | A | B | C
+  deriving DecidableEq, Fintype, Repr
+
+inductive Special
+  | Two | Three | Four
+  deriving DecidableEq, Fintype, Repr
+
+def blockLabel : Block → QuotientSpace quotientDim
+  | .A => quotientLabel .A
+  | .B => quotientLabel .B
+  | .C => quotientLabel .C
+
+def special (n : ℕ) : Special → Ambient n quotientDim
+  | .Two => quotientInclusion n quotientDim (quotientLabel .Two)
+  | .Three => quotientInclusion n quotientDim (quotientLabel .Three)
+  | .Four => quotientInclusion n quotientDim (quotientLabel .Four)
+
+@[simp] theorem quotientProjection_special (n : ℕ) (e : Special) :
+    quotientProjection n quotientDim (special n e) =
+      match e with
+      | .Two => quotientLabel .Two
+      | .Three => quotientLabel .Three
+      | .Four => quotientLabel .Four := by
+  cases e <;> rfl
+
+theorem finrank_selected {n : ℕ} {B : Finset Block} (hB : B.Nonempty)
+    (S : Finset Special) :
+    Module.finrank ℚ (selectedSubspace blockLabel (special n) B S) =
+      n + Module.finrank ℚ
+        (selectedQuotientSpan blockLabel (special n) B S) :=
+  finrank_selectedSubspace blockLabel (special n) hB S
+
+end DeleteOne
+
+/-! ## Deletion of the special element `4` -/
+
+namespace DeleteFour
+
+abbrev QuotientLabel := BlandJensenFormal.MIQuotientLabels.DeleteFour.Label
+
+abbrev quotientDim : ℕ := 3
+
+/-- The six quotient labels `a,b,c,b+c,a+c,b-a`. -/
+def quotientLabel : QuotientLabel → QuotientSpace quotientDim :=
+  BlandJensenFormal.MIQuotientLabels.DeleteFour.label
+
+inductive Block
+  | A | B | C
+  deriving DecidableEq, Fintype, Repr
+
+inductive Special
+  | One | Two | Three
+  deriving DecidableEq, Fintype, Repr
+
+def blockLabel : Block → QuotientSpace quotientDim
+  | .A => quotientLabel .A
+  | .B => quotientLabel .B
+  | .C => quotientLabel .C
+
+def special (n : ℕ) : Special → Ambient n quotientDim
+  | .One => quotientInclusion n quotientDim (quotientLabel .One)
+  | .Two => quotientInclusion n quotientDim (quotientLabel .Two)
+  | .Three => quotientInclusion n quotientDim (quotientLabel .Three)
+
+@[simp] theorem quotientProjection_special (n : ℕ) (e : Special) :
+    quotientProjection n quotientDim (special n e) =
+      match e with
+      | .One => quotientLabel .One
+      | .Two => quotientLabel .Two
+      | .Three => quotientLabel .Three := by
+  cases e <;> rfl
+
+theorem quotient_relation :
+    quotientLabel .Three = quotientLabel .One - quotientLabel .Two := by
+  funext i
+  fin_cases i <;> norm_num [quotientLabel,
+    BlandJensenFormal.MIQuotientLabels.DeleteFour.label]
+
+/-- The fixed three-special dependence `q₃ = q₁ - q₂`. -/
+theorem special_relation (n : ℕ) :
+    special n .Three = special n .One - special n .Two := by
+  simpa [special] using
+    congrArg (quotientInclusion n quotientDim) quotient_relation
+
+theorem finrank_selected {n : ℕ} {B : Finset Block} (hB : B.Nonempty)
+    (S : Finset Special) :
+    Module.finrank ℚ (selectedSubspace blockLabel (special n) B S) =
+      n + Module.finrank ℚ
+        (selectedQuotientSpan blockLabel (special n) B S) :=
+  finrank_selectedSubspace blockLabel (special n) hB S
+
+end DeleteFour
+
+/-! ## Contraction of an element of the `X` block -/
+
+namespace ContractX
+
+abbrev QuotientLabel := BlandJensenFormal.MIQuotientLabels.ContractX.Label
+
+abbrev quotientDim : ℕ := 2
+
+/-- Quotient labels `0,b,c,b+c,c,b,b+c`.  The fourth special vector receives
+an additional common-core component below. -/
+def quotientLabel : QuotientLabel → QuotientSpace quotientDim :=
+  BlandJensenFormal.MIQuotientLabels.ContractX.label
+
+inductive Block
+  | X | Y | Z
+  deriving DecidableEq, Fintype, Repr
+
+inductive Special
+  | One | Two | Three | Four
+  deriving DecidableEq, Fintype, Repr
+
+def blockLabel : Block → QuotientSpace quotientDim
+  | .X => quotientLabel .X
+  | .Y => quotientLabel .Y
+  | .Z => quotientLabel .Z
+
+/-- The special vector `q₄` differs from `q₁` by the common-core perturbation
+`δ`; the other special vectors have zero common-core component. -/
+def special (n : ℕ) : Special → Ambient n quotientDim
+  | .One => specialLift 0 (quotientLabel .One)
+  | .Two => specialLift 0 (quotientLabel .Two)
+  | .Three => specialLift 0 (quotientLabel .Three)
+  | .Four => specialLift (coreDelta n) (quotientLabel .Four)
+
+def specialQuotientLabel : Special → QuotientSpace quotientDim
+  | .One => quotientLabel .One
+  | .Two => quotientLabel .Two
+  | .Three => quotientLabel .Three
+  | .Four => quotientLabel .Four
+
+@[simp] theorem quotientProjection_special (n : ℕ) (e : Special) :
+    quotientProjection n quotientDim (special n e) = specialQuotientLabel e := by
+  cases e <;> rfl
+
+theorem quotient_relation :
+    quotientLabel .One = quotientLabel .Two + quotientLabel .Three := by
+  funext i
+  fin_cases i <;> norm_num [quotientLabel,
+    BlandJensenFormal.MIQuotientLabels.ContractX.label]
+
+/-- The fixed dependence `q₁ = q₂ + q₃`. -/
+theorem special_relation (n : ℕ) :
+    special n .One = special n .Two + special n .Three := by
+  simpa [special, specialLift, quotientInclusion] using
+    congrArg (quotientInclusion n quotientDim) quotient_relation
+
+theorem quotientLabel_four_eq_one :
+    quotientLabel .Four = quotientLabel .One := by
+  decide
+
+/-- The perturbation identity `q₄ = q₁ + (δ,0)`. -/
+theorem special_four_eq_one_add_delta (n : ℕ) :
+    special n .Four = special n .One + coreInclusion n quotientDim (coreDelta n) := by
+  ext i <;> simp [special, specialLift, quotientLabel,
+    BlandJensenFormal.MIQuotientLabels.ContractX.label]
+
+/-- At the zero-dimensional boundary, the perturbation disappears and the
+first and fourth special vectors coincide. -/
+@[simp] theorem special_four_eq_one_of_n_eq_zero :
+    special 0 .Four = special 0 .One := by
+  simp [special_four_eq_one_add_delta]
+
+/-- Coincidence of the first and fourth special vectors occurs exactly at
+the zero-dimensional boundary. -/
+theorem special_four_eq_one_iff (n : ℕ) :
+    special n .Four = special n .One ↔ n = 0 := by
+  constructor
+  · intro h
+    apply (coreDelta_eq_zero_iff n).1
+    have hfst := congrArg Prod.fst h
+    simpa [special, specialLift] using hfst
+  · rintro rfl
+    exact special_four_eq_one_of_n_eq_zero
+
+/-- For positive core dimension, `q₁` and its core perturbation `q₄` are
+linearly independent.  This is the exact role of `δ ≠ 0`. -/
+theorem special_one_four_linearIndependent {n : ℕ} (hn : 0 < n) :
+    LinearIndependent ℚ ![special n .One, special n .Four] := by
+  rw [LinearIndependent.pair_iff]
+  intro s t hsum
+  have hcore := congrArg (fun z : Ambient n quotientDim ↦ z.1 (⟨0, hn⟩ : Fin n)) hsum
+  have ht : t = 0 := by
+    simpa [special, specialLift, coreDelta, hn] using hcore
+  subst t
+  have hquot := congrArg (fun z : Ambient n quotientDim ↦ z.2 0) hsum
+  have hs : s = 0 := by
+    simpa [special, specialLift, quotientLabel,
+      BlandJensenFormal.MIQuotientLabels.ContractX.label] using hquot
+  exact ⟨hs, rfl⟩
+
+theorem finrank_selected {n : ℕ} {B : Finset Block} (hB : B.Nonempty)
+    (S : Finset Special) :
+    Module.finrank ℚ (selectedSubspace blockLabel (special n) B S) =
+      n + Module.finrank ℚ
+        (selectedQuotientSpan blockLabel (special n) B S) :=
+  finrank_selectedSubspace blockLabel (special n) hB S
+
+end ContractX
+
+/-! ## Contraction of the special element `1` -/
+
+namespace ContractOne
+
+abbrev QuotientLabel := BlandJensenFormal.MIQuotientLabels.ContractOne.Label
+
+abbrev quotientDim : ℕ := 2
+
+/-- Quotient representatives for the three lines `h`, `k`, and `l`. -/
+def quotientLabel : QuotientLabel → QuotientSpace quotientDim :=
+  BlandJensenFormal.MIQuotientLabels.ContractOne.label
+
+inductive Block
+  | X | Y | Z
+  deriving DecidableEq, Fintype, Repr
+
+inductive Special
+  | Two | Three | Four
+  deriving DecidableEq, Fintype, Repr
+
+def blockLabel : Block → QuotientSpace quotientDim
+  | .X => quotientLabel .X
+  | .Y => quotientLabel .Y
+  | .Z => quotientLabel .Z
+
+def special (n : ℕ) : Special → Ambient n quotientDim
+  | .Two => quotientInclusion n quotientDim (quotientLabel .Two)
+  | .Three => quotientInclusion n quotientDim (quotientLabel .Three)
+  | .Four => quotientInclusion n quotientDim (quotientLabel .Four)
+
+@[simp] theorem quotientProjection_special (n : ℕ) (e : Special) :
+    quotientProjection n quotientDim (special n e) =
+      match e with
+      | .Two => quotientLabel .Two
+      | .Three => quotientLabel .Three
+      | .Four => quotientLabel .Four := by
+  cases e <;> rfl
+
+theorem quotient_relation : quotientLabel .Two = quotientLabel .Three := by
+  decide
+
+/-- The two fixed special vectors `q₂` and `q₃` coincide. -/
+theorem special_relation (n : ℕ) : special n .Two = special n .Three := by
+  simpa [special] using
+    congrArg (quotientInclusion n quotientDim) quotient_relation
+
+theorem finrank_selected {n : ℕ} {B : Finset Block} (hB : B.Nonempty)
+    (S : Finset Special) :
+    Module.finrank ℚ (selectedSubspace blockLabel (special n) B S) =
+      n + Module.finrank ℚ
+        (selectedQuotientSpan blockLabel (special n) B S) :=
+  finrank_selectedSubspace blockLabel (special n) hB S
+
+end ContractOne
+
+/-! ## Contraction of the special element `4` -/
+
+namespace ContractFour
+
+abbrev QuotientLabel := BlandJensenFormal.MIQuotientLabels.ContractFour.Label
+
+abbrev quotientDim : ℕ := 2
+
+/-- Quotient representatives `a,b,a+b,a,b,a+b`. -/
+def quotientLabel : QuotientLabel → QuotientSpace quotientDim :=
+  BlandJensenFormal.MIQuotientLabels.ContractFour.label
+
+inductive Block
+  | X | Y | Z
+  deriving DecidableEq, Fintype, Repr
+
+inductive Special
+  | One | Two | Three
+  deriving DecidableEq, Fintype, Repr
+
+def blockLabel : Block → QuotientSpace quotientDim
+  | .X => quotientLabel .X
+  | .Y => quotientLabel .Y
+  | .Z => quotientLabel .Z
+
+def special (n : ℕ) : Special → Ambient n quotientDim
+  | .One => quotientInclusion n quotientDim (quotientLabel .One)
+  | .Two => quotientInclusion n quotientDim (quotientLabel .Two)
+  | .Three => quotientInclusion n quotientDim (quotientLabel .Three)
+
+@[simp] theorem quotientProjection_special (n : ℕ) (e : Special) :
+    quotientProjection n quotientDim (special n e) =
+      match e with
+      | .One => quotientLabel .One
+      | .Two => quotientLabel .Two
+      | .Three => quotientLabel .Three := by
+  cases e <;> rfl
+
+theorem quotient_relation :
+    quotientLabel .Three = quotientLabel .One + quotientLabel .Two := by
+  funext i
+  fin_cases i <;> norm_num [quotientLabel,
+    BlandJensenFormal.MIQuotientLabels.ContractFour.label]
+
+/-- The fixed dependence `q₃ = q₁ + q₂`. -/
+theorem special_relation (n : ℕ) :
+    special n .Three = special n .One + special n .Two := by
+  simpa [special] using
+    congrArg (quotientInclusion n quotientDim) quotient_relation
+
+theorem finrank_selected {n : ℕ} {B : Finset Block} (hB : B.Nonempty)
+    (S : Finset Special) :
+    Module.finrank ℚ (selectedSubspace blockLabel (special n) B S) =
+      n + Module.finrank ℚ
+        (selectedQuotientSpan blockLabel (special n) B S) :=
+  finrank_selectedSubspace blockLabel (special n) hB S
+
+end ContractFour
+
+end BlandJensenFormal.BlandJensenMI.Templates
